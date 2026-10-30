@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>HQ-Branch Daily Cash Book</title>
+  <!-- Telegram Mini App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #ffffff);
+      --text: var(--tg-theme-text-color, #111827);
+      --hint: var(--tg-theme-hint-color, #6b7280);
+      --card: var(--tg-theme-secondary-bg-color, #f3f4f6);
+      --accent: var(--tg-theme-button-color, #2563eb);
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); margin: 0; padding: 16px; }
+    .header { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--card); }
+    .header h2 { margin: 0 0 4px 0; font-size: 18px; }
+    .header p { margin: 0; font-size: 13px; color: var(--hint); }
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    select, input, textarea {
+      width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #d1d5db;
+      background: var(--card); color: var(--text); font-size: 15px;
+    }
+    .type-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .type-btn {
+      padding: 10px; text-align: center; border-radius: 8px; font-weight: 600;
+      background: var(--card); cursor: pointer; border: 2px solid transparent;
+    }
+    .type-btn.active.inflow { border-color: #16a34a; color: #16a34a; background: rgba(22, 163, 74, 0.1); }
+    .type-btn.active.outflow { border-color: #dc2626; color: #dc2626; background: rgba(220, 38, 38, 0.1); }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>Daily Cash & Transaction Entry</h2>
+    <p id="user-badge">Verifying staff identity...</p>
+  </div>
+
+  <!-- Transaction Type Toggle -->
+  <div class="type-toggle">
+    <div id="btn-inflow" class="type-btn active inflow" onclick="setTxType('Revenue / Inflow')">+ Revenue / COD</div>
+    <div id="btn-outflow" class="type-btn outflow" onclick="setTxType('Expense / Outflow')">- Expense / Payout</div>
+  </div>
+
+  <div class="form-group">
+    <label>Branch Office</label>
+    <select id="branch" required>
+      <option value="">-- Select Branch --</option>
+      <option value="HQ - Main">HQ - Main</option>
+      <option value="Mandalay">Mandalay</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Category</label>
+    <select id="category" required>
+      <option value="Delivery Fee / Revenue">Delivery Fee / Revenue</option>
+      <option value="COD Collection">COD Collection</option>
+      <option value="Fuel & Rider Transport">Fuel & Rider Transport</option>
+      <option value="Packaging & Supplies">Packaging & Supplies</option>
+      <option value="Office Utility & Petty Cash">Office Utility & Petty Cash</option>
+      <option value="HQ Cash Remittance">HQ Cash Remittance</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Payment Channel</label>
+    <select id="paymentMethod">
+      <option value="Cash">Cash in Drawer</option>
+      <option value="KBZPay / Wave">Mobile Wallet (KBZPay / Wave)</option>
+      <option value="Bank Transfer">Bank Transfer</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Amount</label>
+    <input type="number" id="amount" placeholder="0" inputmode="numeric" required>
+  </div>
+
+  <div class="form-group">
+    <label>Voucher / Reference No. & Remarks</label>
+    <textarea id="remarks" rows="2" placeholder="e.g., Voucher #1042 or Rider fuel"></textarea>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand(); // Expand Mini App to full height
+
+    let txType = 'Revenue / Inflow';
+    const user = tg.initDataUnsafe?.user || { id: 'DEV_MODE', first_name: 'Test Staff', username: 'staff' };
+    document.getElementById('user-badge').innerText = `Logged in: ${user.first_name} (ID: ${user.id})`;
+
+    // Configure Telegram Native Bottom Button
+    tg.MainButton.setText("SUBMIT TO HQ LEDGER");
+    tg.MainButton.show();
+
+    function setTxType(type) {
+      txType = type;
+      document.getElementById('btn-inflow').classList.toggle('active', type.includes('Revenue'));
+      document.getElementById('btn-outflow').classList.toggle('active', type.includes('Expense'));
+    }
+
+    // Handle Submission
+    tg.MainButton.onClick(async () => {
+      const branch = document.getElementById('branch').value;
+      const amount = Number(document.getElementById('amount').value);
+      const category = document.getElementById('category').value;
+      const paymentMethod = document.getElementById('paymentMethod').value;
+      const remarks = document.getElementById('remarks').value.trim();
+
+      if (!branch || !amount || amount <= 0) {
+        tg.showAlert("Please select a branch and enter a valid amount.");
+        return;
+      }
+
+      tg.MainButton.showProgress();
+      tg.MainButton.disable();
+
+      const payload = {
+        timestamp: new Date().toLocaleString("en-GB", { timeZone: "Asia/Yangon" }),
+        branch,
+        txType,
+        category,
+        paymentMethod,
+        amount,
+        remarks,
+        staffId: user.id,
+        staffName: user.first_name
+      };
+
+try {
+        const ENDPOINT_URL = "PASTE_YOUR_GOOGLE_SCRIPT_WEB_APP_URL_HERE";
+        
+        await fetch(ENDPOINT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
+
+        tg.HapticFeedback.notificationOccurred('success');
+        tg.showAlert("Recorded successfully in HQ Ledger!", () => tg.close());
+      } catch (err) {
+        tg.HapticFeedback.notificationOccurred('error');
+        tg.showAlert("Submission failed. Please check your connection.");
+        tg.MainButton.hideProgress();
+        tg.MainButton.enable();
+      }
+    });
+  </script>
+</body>
+</html>
